@@ -1503,6 +1503,15 @@ func (i PcRelAddressing) Op() uint32 {
 	return ExtractBits(uint32(i), 31, 1)
 }
 
+func (i PcRelAddressing) Immediate() int32 {
+	return (i.Immhi() << 2) + int32(i.Immlo())
+}
+
+func (i PcRelAddressing) WithUpdatedImmediate(v int32) uint32 {
+	newInstr := SetBits(uint32(i), uint32(v>>2), 5, 19)
+	return SetBits(newInstr, uint32(v), 29, 2)
+}
+
 type AddSubImm uint32
 
 func (i AddSubImm) Rd() uint32 {
@@ -6143,6 +6152,13 @@ func MaskLSB32(x uint32, nbits uint8) uint32 {
 
 func ExtractBits(x uint32, start, nbits int32) uint32 {
 	return MaskLSB32(x>>start, uint8(nbits))
+}
+
+func SetBits(x, v uint32, start, nbits int32) uint32 {
+	v &= lsb32Mtable[nbits]
+	x &= ^(lsb32Mtable[nbits] << start)
+	x |= (v << start)
+	return x
 }
 
 func signExtend(value, bits uint32) uint32 {

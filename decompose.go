@@ -1301,6 +1301,10 @@ func (i *Instruction) decompose_simd_3_reg_ext() (*Instruction, error) {
 		i.operands[2].DataSize = dsizeMap[decode.Q()]
 	case 1:
 		if decode.Size() < 3 {
+			// be defensive against invalid pattern
+			if decode.Size() == 0 {
+				return nil, failedToDecodeInstruction
+			}
 			var eMap = [3]uint32{0, 2, 4}
 			var dsizeMap = [2]uint32{8, 16}
 			i.operands[0].ElementSize = eMap[decode.Size()]
@@ -1311,6 +1315,10 @@ func (i *Instruction) decompose_simd_3_reg_ext() (*Instruction, error) {
 			i.operands[2].DataSize = dsizeMap[decode.Q()] / eMap[decode.Size()]
 		}
 	case 2:
+		// be defensive against invalid pattern
+		if decode.Size() == 0 {
+			return nil, failedToDecodeInstruction
+		}
 		var eMap = [4]uint32{0, 2, 4, 8}
 		var dsizeMap = [2]uint32{8, 16}
 		var rotMap = [4]uint32{0, 90, 180, 270}
@@ -1323,6 +1331,10 @@ func (i *Instruction) decompose_simd_3_reg_ext() (*Instruction, error) {
 		i.operands[2].HasRotation = true
 		i.operands[2].Rotation = rotMap[ExtractBits(i.raw, 11, 2)] // rot
 	case 3:
+		// be defensive against invalid pattern
+		if decode.Size() == 0 {
+			return nil, failedToDecodeInstruction
+		}
 		var eMap = [4]uint32{0, 2, 4, 8}
 		var dsizeMap = [2]uint32{8, 16}
 		var rotMap = [2]uint32{90, 270}

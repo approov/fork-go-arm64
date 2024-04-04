@@ -15,8 +15,35 @@ type Options struct {
 // Result Disassemble instruction result
 type Result struct {
 	StrRepr     string
+	Annotation  string
 	Instruction *Instruction
 	Error       error
+}
+
+// Disassemble will output the disassembly of the data of a given io.ReadSeeker
+func DisassembleInstr(r io.ReadSeeker, offset int64, addr int64) (*Instruction, string, string, error) {
+	actualOffset, err := r.Seek(offset, io.SeekCurrent)
+	if (actualOffset != offset) || (err != nil) {
+		return nil, "", "", fmt.Errorf("failed to seek to offset")
+	}
+	var instrValue uint32
+	err = binary.Read(r, binary.LittleEndian, &instrValue)
+	if err != nil {
+		return nil, "", "", fmt.Errorf("failed to read instruction: 0x%08x (%v)", addr, err)
+	}
+	instr, err := decompose(instrValue, uint64(addr))
+	if err != nil {
+		return nil, "", "", fmt.Errorf("failed to decompose instruction: 0x%08x: 0x%08x (%v)", addr, instrValue, err)
+	}
+	disassembly, err := instr.disassemble(false)
+	if err != nil {
+		return nil, "", "", fmt.Errorf("failed to disassemble instruction: 0x%08x: 0x%08x (%v)", addr, instrValue, err)
+	}
+	annotation, err := instr.annotate()
+	if err != nil {
+		return nil, "", "", fmt.Errorf("failed to disassemble instruction: 0x%08x: 0x%08x (%v)", addr, instrValue, err)
+	}
+	return instr, disassembly, annotation, nil
 }
 
 // Disassemble will output the disassembly of the data of a given io.ReadSeeker
@@ -51,7 +78,7 @@ func Disassemble(r io.ReadSeeker, options Options) <-chan Result {
 				addr = 0
 			}
 
-			i, err := decompose(instrValue, uint64(addr))
+			instruction, err := decompose(instrValue, uint64(addr))
 			if err != nil {
 				if err == failedToDecodeInstruction || err == failedToDisassembleOperation {
 					out <- Result{
@@ -67,7 +94,7 @@ func Disassemble(r io.ReadSeeker, options Options) <-chan Result {
 				continue
 			}
 
-			instruction, err := i.disassemble(options.DecimalImm)
+			disassembly, err := instruction.disassemble(options.DecimalImm)
 			if err != nil {
 				out <- Result{
 					StrRepr: fmt.Sprintf("%#08x:  %s\t<unknown>", uint64(addr), getOpCodeByteString(instrValue)),
@@ -76,9 +103,19 @@ func Disassemble(r io.ReadSeeker, options Options) <-chan Result {
 				continue
 			}
 
+			annotation, err := instruction.annotate()
+			if err != nil {
+				out <- Result{
+					StrRepr: fmt.Sprintf("%#08x:  %s\t<unknown>", uint64(addr), getOpCodeByteString(instrValue)),
+					Error:   fmt.Errorf("failed to annotate instruction: 0x%08x; %v", instrValue, err),
+				}
+				continue
+			}
+
 			out <- Result{
-				StrRepr:     fmt.Sprintf("%#08x:  %s\t%s", uint64(addr), getOpCodeByteString(instrValue), instruction),
-				Instruction: i,
+				StrRepr:     fmt.Sprintf("%#08x:  %s\t%s", uint64(addr), getOpCodeByteString(instrValue), disassembly),
+				Annotation:  annotation,
+				Instruction: instruction,
 				Error:       nil,
 			}
 		}

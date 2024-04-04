@@ -41,6 +41,11 @@ func (i *Instruction) decompose_add_sub_carry() (*Instruction, error) {
 			i.deleteOperand(1)
 		}
 	}
+	i.readRegs = (1 << decode.Rn()) | (1 << decode.Rm()) | RWREGS_STATUS
+	i.writeRegs = 1 << decode.Rd()
+	if decode.S() != 0 {
+		i.writeRegs |= RWREGS_STATUS
+	}
 	// return decode.Opcode2() != 0
 	return i, nil
 }
@@ -104,6 +109,11 @@ func (i *Instruction) decompose_add_sub_extended_reg() (*Instruction, error) {
 			i.deleteOperand(0)
 		}
 	}
+	i.readRegs = (1 << decode.Rn()) | (1 << decode.Rm())
+	i.writeRegs = 1 << decode.Rd()
+	if decode.S() != 0 {
+		i.writeRegs |= RWREGS_STATUS
+	}
 	// 	return decode.opt != 0
 	return i, nil
 }
@@ -161,7 +171,11 @@ func (i *Instruction) decompose_add_sub_imm() (*Instruction, error) {
 		i.operation = ARM64_CMN
 		i.deleteOperand(0)
 	}
-
+	i.readRegs = 1 << decode.Rn()
+	i.writeRegs = 1 << decode.Rd()
+	if decode.S() != 0 {
+		i.writeRegs |= RWREGS_STATUS
+	}
 	return i, nil
 }
 
@@ -194,6 +208,10 @@ func (i *Instruction) decompose_add_sub_imm_tags() (*Instruction, error) {
 	// tag_offset
 	i.operands[3].OpClass = IMM32
 	i.operands[3].Immediate = uint64(decode.Uimm4())
+
+	// register access masks
+	i.readRegs = 1 << decode.Xn()
+	i.writeRegs = 1 << decode.Xd()
 
 	return i, nil
 }
@@ -257,6 +275,12 @@ func (i *Instruction) decompose_add_sub_shifted_reg() (*Instruction, error) {
 			i.operation = ARM64_NEGS
 			i.deleteOperand(1)
 		}
+	}
+
+	i.readRegs = (1 << decode.Rn()) | (1 << decode.Rm())
+	i.writeRegs = 1 << decode.Rd()
+	if decode.S() != 0 {
+		i.writeRegs |= RWREGS_STATUS
 	}
 
 	return i, nil
@@ -415,7 +439,8 @@ func (i *Instruction) decompose_bitfield() (*Instruction, error) {
 			}
 		}
 	}
-
+	i.readRegs = 1 << decode.Rn()
+	i.writeRegs = 1 << decode.Rd()
 	return i, nil
 }
 
@@ -442,6 +467,10 @@ func (i *Instruction) decompose_compare_branch_imm() (*Instruction, error) {
 		i.operands[1].SignedImm = 1
 	}
 	i.operands[1].Immediate = uint64(imm)
+
+	i.branchType = BranchTypeCond
+	i.branchTargetAddr = uint64(imm)
+	i.readRegs = 1 << decode.Rt()
 
 	return i, nil
 }
@@ -471,6 +500,10 @@ func (i *Instruction) decompose_conditional_branch() (*Instruction, error) {
 		return nil, failedToDecodeInstruction
 	}
 
+	i.branchType = BranchTypeCond
+	i.branchTargetAddr = uint64(imm)
+	i.readRegs = RWREGS_STATUS
+
 	return i, nil
 }
 
@@ -498,6 +531,9 @@ func (i *Instruction) decompose_conditional_compare_imm() (*Instruction, error) 
 		return nil, failedToDecodeInstruction
 	}
 
+	i.readRegs = (1 << decode.Rn()) | RWREGS_STATUS
+	i.writeRegs = RWREGS_STATUS
+
 	return i, nil
 }
 
@@ -524,6 +560,9 @@ func (i *Instruction) decompose_conditional_compare_reg() (*Instruction, error) 
 	if decode.O2() != 0 || decode.O3() != 0 {
 		return nil, failedToDecodeInstruction
 	}
+
+	i.readRegs = (1 << decode.Rn()) | (1 << decode.Rm()) | RWREGS_STATUS
+	i.writeRegs = RWREGS_STATUS
 
 	return i, nil
 }
@@ -594,6 +633,9 @@ func (i *Instruction) decompose_conditional_select() (*Instruction, error) {
 	if decode.S() != 0 || decode.Op2() > 1 {
 		return nil, failedToDecodeInstruction
 	}
+
+	i.readRegs = (1 << decode.Rn()) | (1 << decode.Rm()) | RWREGS_STATUS
+	i.writeRegs = 1 << decode.Rd()
 
 	return i, nil
 }
@@ -810,8 +852,11 @@ func (i *Instruction) decompose_data_processing_1() (*Instruction, error) {
 			return nil, failedToDecodeInstruction // TODO should this be error or success?
 		}
 	default:
-		return i, nil
+		break
 	}
+
+	i.readRegs = 1 << decode.Rn()
+	i.writeRegs = 1 << decode.Rd()
 
 	return i, nil
 }
@@ -921,6 +966,12 @@ func (i *Instruction) decompose_data_processing_2() (*Instruction, error) {
 		i.operands[2].OpClass = NONE
 	}
 
+	i.readRegs = (1 << decode.Rn()) | (1 << decode.Rm())
+	i.writeRegs = 1 << decode.Rd()
+	if decode.S() != 0 {
+		i.writeRegs |= RWREGS_STATUS
+	}
+
 	return i, nil
 }
 
@@ -996,6 +1047,9 @@ func (i *Instruction) decompose_data_processing_3() (*Instruction, error) {
 		return nil, failedToDecodeInstruction
 	}
 
+	i.readRegs = (1 << decode.Rn()) | (1 << decode.Rm()) | (1 << decode.Ra())
+	i.writeRegs = 1 << decode.Rd()
+
 	return i, nil
 }
 
@@ -1033,6 +1087,12 @@ func (i *Instruction) decompose_exception_generation() (*Instruction, error) {
 		return nil, failedToDecodeInstruction
 	}
 
+	i.branchType = BranchTypeException
+
+	// we consider an exception to potentially read and write all registers
+	i.readRegs = RWREGS_ALL
+	i.writeRegs = RWREGS_ALL
+
 	return i, nil
 }
 
@@ -1067,6 +1127,9 @@ func (i *Instruction) decompose_extract() (*Instruction, error) {
 	if decode.Sf() == 0 && decode.Imms() > 32 {
 		return nil, failedToDecodeInstruction
 	}
+
+	i.readRegs = (1 << decode.Rn()) | (1 << decode.Rm())
+	i.writeRegs = 1 << decode.Rd()
 
 	return i, nil
 }
@@ -1112,6 +1175,7 @@ func (i *Instruction) decompose_fixed_floating_conversion() (*Instruction, error
 			var regSize = [2]uint32{REG_W_BASE, REG_X_BASE}
 			i.operands[0].Reg[0] = reg(REGSET_ZR, int(sdReg[decode.Type()&1]), int(decode.Rd()))
 			i.operands[1].Reg[0] = reg(REGSET_ZR, int(regSize[decode.Sf()]), int(decode.Rn()))
+			i.readRegs = 1 << decode.Rn()
 		}
 		break
 	case ARM64_FCVTZU:
@@ -1123,6 +1187,7 @@ func (i *Instruction) decompose_fixed_floating_conversion() (*Instruction, error
 		}
 		i.operands[0].Reg[0] = reg(REGSET_ZR, int(regSize[decode.Sf()]), int(decode.Rd()))
 		i.operands[1].Reg[0] = reg(REGSET_ZR, int(sdReg[decode.Type()]), int(decode.Rn()))
+		i.writeRegs = 1 << decode.Rd()
 		break
 	}
 
@@ -1748,6 +1813,7 @@ func (i *Instruction) decompose_floating_integer_conversion() (*Instruction, err
 			var wxReg = [2]uint32{REG_W_BASE, REG_X_BASE}
 			i.operands[0].Reg[0] = reg(REGSET_ZR, int(sdReg[decode.Type()&1]), int(decode.Rd()))
 			i.operands[1].Reg[0] = reg(REGSET_ZR, int(wxReg[decode.Sf()]), int(decode.Rn()))
+			i.readRegs = 1 << decode.Rn()
 		}
 		break
 	case ARM64_FMOV:
@@ -1755,6 +1821,12 @@ func (i *Instruction) decompose_floating_integer_conversion() (*Instruction, err
 			var swReg = [2]uint32{REG_W_BASE, REG_S_BASE}
 			i.operands[0].Reg[0] = reg(REGSET_ZR, int(swReg[decode.Opcode()&1]), int(decode.Rd()))
 			i.operands[1].Reg[0] = reg(REGSET_ZR, int(swReg[(^decode.Opcode()&1)]), int(decode.Rn())) // TODO: is this always correct? replaced !
+			if (decode.Opcode() & 1) == 1 {
+				i.readRegs = 1 << decode.Rn()
+			}
+			if (decode.Opcode() & 1) == 0 {
+				i.writeRegs = 1 << decode.Rd()
+			}
 		} else {
 			reg1 := 1 ^ (decode.Opcode() & 1)
 			reg2 := decode.Opcode() & 1
@@ -1770,11 +1842,18 @@ func (i *Instruction) decompose_floating_integer_conversion() (*Instruction, err
 				i.operands[0].Reg[0] = reg(REGSET_ZR, int(dxReg[reg1]), int(decode.Rd()))
 				i.operands[1].Reg[0] = reg(REGSET_ZR, int(dxReg[reg2]), int(decode.Rn()))
 			}
+			if reg2 == 1 {
+				i.readRegs = 1 << decode.Rn()
+			}
+			if reg1 == 1 {
+				i.writeRegs = 1 << decode.Rd()
+			}
 		}
 		break
 	default:
 		i.operands[0].Reg[0] = reg(REGSET_ZR, int(dstReg[decode.Sf()]), int(decode.Rd()))
 		i.operands[1].Reg[0] = reg(REGSET_ZR, int(srcReg[decode.Type()&1]), int(decode.Rn()))
+		i.writeRegs = 1 << decode.Rd()
 		break
 	}
 
@@ -1797,6 +1876,7 @@ func (i *Instruction) decompose_floating_javascript_conversion() (*Instruction, 
 	i.operands[0].Reg[0] = uint32(regMap[REGSET_ZR][REG_W_BASE][decode.Rd()])
 	i.operands[1].OpClass = REG
 	i.operands[1].Reg[0] = uint32(regMap[REGSET_ZR][REG_D_BASE][decode.Rn()])
+	i.writeRegs = 1 << decode.Rd()
 	return i, nil
 }
 
@@ -1846,6 +1926,9 @@ func (i *Instruction) decompose_load_register_literal() (*Instruction, error) {
 
 	if i.operation == ARM64_UNDEFINED {
 		return nil, failedToDecodeInstruction
+	}
+	if (decode.V() == 0) && (op.operation != ARM64_PRFM) {
+		i.writeRegs = 1 << decode.Rt()
 	}
 
 	return i, nil
@@ -1935,8 +2018,11 @@ func (i *Instruction) decompose_load_store_mem_tags() (*Instruction, error) {
 	case 0b0100:
 		if i.operation == ARM64_LDG {
 			i.operands[0].Reg[0] = reg(REGSET_ZR, REG_X_BASE, int(decode.Rt()))
+			i.readRegs = 1 << decode.Rn()
+			i.writeRegs = 1 << decode.Rt()
 		} else {
 			i.operands[0].Reg[0] = reg(REGSET_SP, REG_X_BASE, int(decode.Rt()))
+			i.readRegs = (1 << decode.Rn()) | (1 << decode.Rt())
 		}
 
 		i.operands[1].SignedImm = 1
@@ -1947,6 +2033,7 @@ func (i *Instruction) decompose_load_store_mem_tags() (*Instruction, error) {
 		break
 	default:
 		i.operands[0].Reg[0] = reg(REGSET_ZR, REG_X_BASE, int(decode.Rt()))
+		i.readRegs = (1 << decode.Rn()) | (1 << decode.Rt())
 		break
 	}
 
@@ -2039,6 +2126,12 @@ func (i *Instruction) decompose_load_store_unscaled() (*Instruction, error) {
 		return nil, failedToDisassembleOperation
 	}
 
+	i.readRegs = 1 << decode.Rn()
+	if decode.Opc() == 0 {
+		i.readRegs |= 1 << decode.Rt()
+	} else {
+		i.writeRegs = 1 << decode.Rt()
+	}
 	return i, nil
 }
 
@@ -2175,6 +2268,19 @@ func (i *Instruction) decompose_load_store_exclusive() (*Instruction, error) {
 		return nil, failedToDisassembleOperation
 	}
 
+	i.readRegs = 1 << decode.Rn()
+	i.writeRegs = 1 << decode.Rs()
+	if decode.L() == 1 {
+		i.writeRegs |= 1 << decode.Rt()
+		if (i.operation == ARM64_LDXP) || (i.operation == ARM64_LDAXP) {
+			i.writeRegs |= 1 << decode.Rt2()
+		}
+	} else {
+		i.readRegs |= 1 << decode.Rt()
+		if (i.operation == ARM64_STXP) || (i.operation == ARM64_STLXP) {
+			i.readRegs |= 1 << decode.Rt2()
+		}
+	}
 	return i, nil
 }
 
@@ -2231,6 +2337,9 @@ func (i *Instruction) decompose_load_store_imm_post_idx() (*Instruction, error) 
 	if i.operation == ARM64_UNDEFINED {
 		return nil, failedToDisassembleOperation
 	}
+
+	i.readRegs = 1 << decode.Rn()
+	i.writeRegs = 1 << decode.Rt()
 
 	return i, nil
 }
@@ -2291,6 +2400,9 @@ func (i *Instruction) decompose_load_store_reg_imm_pre_idx() (*Instruction, erro
 	if i.operation == ARM64_UNDEFINED {
 		return nil, failedToDisassembleOperation
 	}
+
+	i.readRegs = 1 << decode.Rn()
+	i.writeRegs = 1 << decode.Rt()
 
 	return i, nil
 }
@@ -2397,6 +2509,13 @@ func (i *Instruction) decompose_atomic_memory_ops() (*Instruction, error) {
 		return nil, failedToDisassembleOperation
 	}
 
+	i.readRegs = 1 << decode.Rn()
+	i.writeRegs = 1 << decode.Rt()
+	if decode.Opc() == 0 {
+		// swap operations reads Rt too
+		i.readRegs |= 1 << decode.Rt()
+	}
+
 	return i, nil
 }
 
@@ -2421,6 +2540,9 @@ func (i *Instruction) decompose_load_store_pac() (*Instruction, error) {
 		i.operands[1].Immediate = 0
 	}
 	i.operands[1].Immediate |= uint64(decode.Imm() << decode.Size())
+
+	i.readRegs = 1 << decode.Rn()
+	i.writeRegs = 1 << decode.Rt()
 
 	return i, nil
 }
@@ -2465,6 +2587,13 @@ func (i *Instruction) decompose_load_store_no_allocate_pair_offset() (*Instructi
 
 	if i.operation == ARM64_UNDEFINED || decode.Opc() > 2 {
 		return nil, failedToDisassembleOperation
+	}
+
+	i.readRegs = 1 << decode.Rn()
+	if decode.L() == 1 {
+		i.writeRegs = (1 << decode.Rt()) | (1 << decode.Rt2())
+	} else {
+		i.readRegs |= (1 << decode.Rt()) | (1 << decode.Rt2())
 	}
 
 	return i, nil
@@ -2523,6 +2652,13 @@ func (i *Instruction) decompose_load_store_reg_imm_common() (*Instruction, error
 		return nil, failedToDisassembleOperation
 	}
 
+	i.readRegs |= 1 << decode.Rn()
+	if (i.operation == ARM64_LDP) || (i.operation == ARM64_LDPSW) {
+		i.writeRegs |= (1 << decode.Rt()) | (1 << decode.Rt2())
+	} else if (i.operation == ARM64_STP) || (i.operation == ARM64_STGP) {
+		i.readRegs |= (1 << decode.Rt()) | (1 << decode.Rt2())
+	}
+
 	return i, nil
 }
 
@@ -2563,6 +2699,7 @@ func (i *Instruction) decompose_load_store_reg_pair_pre_idx() (*Instruction, err
 	decode := LdstRegPairOffset(i.raw)
 
 	i.operation = operation[decode.Opc()][decode.V()][decode.L()]
+	i.writeRegs = 1 << decode.Rn()
 
 	return i.decompose_load_store_reg_imm_common()
 }
@@ -2673,55 +2810,56 @@ func (i *Instruction) decompose_load_store_reg_reg_offset() (*Instruction, error
 		operation    Operation
 		registerBase uint32
 		amount       [2]int32
+		store        bool
 	}
 	var operation = [4][2][4]opreg{
 		{
 			{
-				{ARM64_STRB, REG_W_BASE, [2]int32{-1, 0}},
-				{ARM64_LDRB, REG_W_BASE, [2]int32{-1, 0}},
-				{ARM64_LDRSB, REG_X_BASE, [2]int32{-1, 0}},
-				{ARM64_LDRSB, REG_W_BASE, [2]int32{-1, 0}},
+				{ARM64_STRB, REG_W_BASE, [2]int32{-1, 0}, true},
+				{ARM64_LDRB, REG_W_BASE, [2]int32{-1, 0}, false},
+				{ARM64_LDRSB, REG_X_BASE, [2]int32{-1, 0}, false},
+				{ARM64_LDRSB, REG_W_BASE, [2]int32{-1, 0}, false},
 			}, {
-				{ARM64_STR, REG_B_BASE, [2]int32{-1, 0}},
-				{ARM64_LDR, REG_B_BASE, [2]int32{-1, 0}},
-				{ARM64_STR, REG_Q_BASE, [2]int32{0, 4}},
-				{ARM64_LDR, REG_Q_BASE, [2]int32{0, 4}},
+				{ARM64_STR, REG_B_BASE, [2]int32{-1, 0}, true},
+				{ARM64_LDR, REG_B_BASE, [2]int32{-1, 0}, false},
+				{ARM64_STR, REG_Q_BASE, [2]int32{0, 4}, true},
+				{ARM64_LDR, REG_Q_BASE, [2]int32{0, 4}, false},
 			},
 		}, {
 			{
-				{ARM64_STRH, REG_W_BASE, [2]int32{0, 1}},
-				{ARM64_LDRH, REG_W_BASE, [2]int32{0, 1}},
-				{ARM64_LDRSH, REG_X_BASE, [2]int32{0, 1}},
-				{ARM64_LDRSH, REG_W_BASE, [2]int32{0, 1}},
+				{ARM64_STRH, REG_W_BASE, [2]int32{0, 1}, true},
+				{ARM64_LDRH, REG_W_BASE, [2]int32{0, 1}, false},
+				{ARM64_LDRSH, REG_X_BASE, [2]int32{0, 1}, false},
+				{ARM64_LDRSH, REG_W_BASE, [2]int32{0, 1}, false},
 			}, {
-				{ARM64_STR, REG_H_BASE, [2]int32{0, 1}},
-				{ARM64_LDR, REG_H_BASE, [2]int32{0, 1}},
-				{ARM64_UNDEFINED, 0, [2]int32{0, 0}},
-				{ARM64_UNDEFINED, 0, [2]int32{0, 0}},
+				{ARM64_STR, REG_H_BASE, [2]int32{0, 1}, true},
+				{ARM64_LDR, REG_H_BASE, [2]int32{0, 1}, false},
+				{ARM64_UNDEFINED, 0, [2]int32{0, 0}, false},
+				{ARM64_UNDEFINED, 0, [2]int32{0, 0}, false},
 			},
 		}, {
 			{
-				{ARM64_STR, REG_W_BASE, [2]int32{0, 2}},
-				{ARM64_LDR, REG_W_BASE, [2]int32{0, 2}},
-				{ARM64_LDRSW, REG_X_BASE, [2]int32{0, 2}},
-				{ARM64_UNDEFINED, 0, [2]int32{0, 0}},
+				{ARM64_STR, REG_W_BASE, [2]int32{0, 2}, true},
+				{ARM64_LDR, REG_W_BASE, [2]int32{0, 2}, false},
+				{ARM64_LDRSW, REG_X_BASE, [2]int32{0, 2}, false},
+				{ARM64_UNDEFINED, 0, [2]int32{0, 0}, false},
 			}, {
-				{ARM64_STR, REG_S_BASE, [2]int32{0, 2}},
-				{ARM64_LDR, REG_S_BASE, [2]int32{0, 2}},
-				{ARM64_UNDEFINED, 0, [2]int32{0, 0}},
-				{ARM64_UNDEFINED, 0, [2]int32{0, 0}},
+				{ARM64_STR, REG_S_BASE, [2]int32{0, 2}, true},
+				{ARM64_LDR, REG_S_BASE, [2]int32{0, 2}, false},
+				{ARM64_UNDEFINED, 0, [2]int32{0, 0}, false},
+				{ARM64_UNDEFINED, 0, [2]int32{0, 0}, false},
 			},
 		}, {
 			{
-				{ARM64_STR, REG_X_BASE, [2]int32{0, 3}},
-				{ARM64_LDR, REG_X_BASE, [2]int32{0, 3}},
-				{ARM64_PRFM, REG_PF_BASE, [2]int32{0, 0}},
-				{ARM64_UNDEFINED, 0, [2]int32{0, 0}},
+				{ARM64_STR, REG_X_BASE, [2]int32{0, 3}, true},
+				{ARM64_LDR, REG_X_BASE, [2]int32{0, 3}, false},
+				{ARM64_PRFM, REG_PF_BASE, [2]int32{0, 0}, false},
+				{ARM64_UNDEFINED, 0, [2]int32{0, 0}, false},
 			}, {
-				{ARM64_STR, REG_D_BASE, [2]int32{0, 3}},
-				{ARM64_LDR, REG_D_BASE, [2]int32{0, 3}},
-				{ARM64_UNDEFINED, 0, [2]int32{0, 0}},
-				{ARM64_UNDEFINED, 0, [2]int32{0, 0}},
+				{ARM64_STR, REG_D_BASE, [2]int32{0, 3}, true},
+				{ARM64_LDR, REG_D_BASE, [2]int32{0, 3}, false},
+				{ARM64_UNDEFINED, 0, [2]int32{0, 0}, false},
+				{ARM64_UNDEFINED, 0, [2]int32{0, 0}, false},
 			},
 		},
 	}
@@ -2774,6 +2912,11 @@ func (i *Instruction) decompose_load_store_reg_reg_offset() (*Instruction, error
 		return nil, failedToDisassembleOperation
 	}
 
+	if op.store {
+		i.readRegs |= 1 << decode.Rt()
+	} else {
+		i.writeRegs = 1 << decode.Rt()
+	}
 	return i, nil
 }
 
@@ -2819,6 +2962,15 @@ func (i *Instruction) decompose_load_store_reg_unpriv() (*Instruction, error) {
 
 	if i.operation == ARM64_UNDEFINED {
 		return nil, failedToDisassembleOperation
+	}
+
+	i.readRegs = 1 << decode.Rn()
+	if decode.Opc() == 0 {
+		// we have a store operation
+		i.readRegs |= 1 << decode.Rt()
+	} else {
+		// we have a load operation
+		i.writeRegs = 1 << decode.Rt()
 	}
 
 	return i, nil
@@ -2876,6 +3028,15 @@ func (i *Instruction) decompose_load_store_reg_unscalled_imm() (*Instruction, er
 		return nil, failedToDisassembleOperation
 	}
 
+	i.readRegs = 1 << decode.Rn()
+	if decode.Opc() == 0 {
+		// we have a store operation
+		i.readRegs |= 1 << decode.Rt()
+	} else {
+		// we have a load operation
+		i.writeRegs = 1 << decode.Rt()
+	}
+
 	return i, nil
 }
 
@@ -2910,55 +3071,56 @@ func (i *Instruction) decompose_load_store_reg_unsigned_imm() (*Instruction, err
 		operation    Operation
 		registerBase uint32
 		amount       uint32
+		store        bool
 	}
 	var operation = [4][2][4]opreg{
 		{
 			{
-				{ARM64_STRB, REG_W_BASE, 0},
-				{ARM64_LDRB, REG_W_BASE, 0},
-				{ARM64_LDRSB, REG_X_BASE, 0},
-				{ARM64_LDRSB, REG_W_BASE, 0},
+				{ARM64_STRB, REG_W_BASE, 0, true},
+				{ARM64_LDRB, REG_W_BASE, 0, false},
+				{ARM64_LDRSB, REG_X_BASE, 0, false},
+				{ARM64_LDRSB, REG_W_BASE, 0, false},
 			}, {
-				{ARM64_STR, REG_B_BASE, 0},
-				{ARM64_LDR, REG_B_BASE, 0},
-				{ARM64_STR, REG_Q_BASE, 4},
-				{ARM64_LDR, REG_Q_BASE, 4},
+				{ARM64_STR, REG_B_BASE, 0, true},
+				{ARM64_LDR, REG_B_BASE, 0, false},
+				{ARM64_STR, REG_Q_BASE, 4, true},
+				{ARM64_LDR, REG_Q_BASE, 4, false},
 			},
 		}, {
 			{
-				{ARM64_STRH, REG_W_BASE, 1},
-				{ARM64_LDRH, REG_W_BASE, 1},
-				{ARM64_LDRSH, REG_X_BASE, 1},
-				{ARM64_LDRSH, REG_W_BASE, 1},
+				{ARM64_STRH, REG_W_BASE, 1, true},
+				{ARM64_LDRH, REG_W_BASE, 1, false},
+				{ARM64_LDRSH, REG_X_BASE, 1, false},
+				{ARM64_LDRSH, REG_W_BASE, 1, false},
 			}, {
-				{ARM64_STR, REG_H_BASE, 1},
-				{ARM64_LDR, REG_H_BASE, 1},
-				{ARM64_UNDEFINED, 0, 0},
-				{ARM64_UNDEFINED, 0, 0},
+				{ARM64_STR, REG_H_BASE, 1, true},
+				{ARM64_LDR, REG_H_BASE, 1, false},
+				{ARM64_UNDEFINED, 0, 0, false},
+				{ARM64_UNDEFINED, 0, 0, false},
 			},
 		}, {
 			{
-				{ARM64_STR, REG_W_BASE, 2},
-				{ARM64_LDR, REG_W_BASE, 2},
-				{ARM64_LDRSW, REG_X_BASE, 2},
-				{ARM64_UNDEFINED, 0, 2},
+				{ARM64_STR, REG_W_BASE, 2, true},
+				{ARM64_LDR, REG_W_BASE, 2, false},
+				{ARM64_LDRSW, REG_X_BASE, 2, false},
+				{ARM64_UNDEFINED, 0, 2, false},
 			}, {
-				{ARM64_STR, REG_S_BASE, 2},
-				{ARM64_LDR, REG_S_BASE, 2},
-				{ARM64_UNDEFINED, 0, 0},
-				{ARM64_UNDEFINED, 0, 0},
+				{ARM64_STR, REG_S_BASE, 2, true},
+				{ARM64_LDR, REG_S_BASE, 2, false},
+				{ARM64_UNDEFINED, 0, 0, false},
+				{ARM64_UNDEFINED, 0, 0, false},
 			},
 		}, {
 			{
-				{ARM64_STR, REG_X_BASE, 3},
-				{ARM64_LDR, REG_X_BASE, 3},
-				{ARM64_PRFM, REG_PF_BASE, 3},
-				{ARM64_UNDEFINED, 0, 0},
+				{ARM64_STR, REG_X_BASE, 3, true},
+				{ARM64_LDR, REG_X_BASE, 3, false},
+				{ARM64_PRFM, REG_PF_BASE, 3, false},
+				{ARM64_UNDEFINED, 0, 0, false},
 			}, {
-				{ARM64_STR, REG_D_BASE, 3},
-				{ARM64_LDR, REG_D_BASE, 3},
-				{ARM64_UNDEFINED, 0, 0},
-				{ARM64_UNDEFINED, 0, 0},
+				{ARM64_STR, REG_D_BASE, 3, true},
+				{ARM64_LDR, REG_D_BASE, 3, false},
+				{ARM64_UNDEFINED, 0, 0, false},
+				{ARM64_UNDEFINED, 0, 0, false},
 			},
 		},
 	}
@@ -2977,6 +3139,12 @@ func (i *Instruction) decompose_load_store_reg_unsigned_imm() (*Instruction, err
 		return nil, failedToDisassembleOperation
 	}
 
+	i.readRegs = 1 << decode.Rn()
+	if op.store {
+		i.readRegs |= 1 << decode.Rt()
+	} else {
+		i.writeRegs = 1 << decode.Rt()
+	}
 	return i, nil
 }
 
@@ -3071,6 +3239,11 @@ func (i *Instruction) decompose_logical_imm() (*Instruction, error) {
 	if (decode.Sf() == 0) && (decode.N() != 0) {
 		return nil, failedToDecodeInstruction
 	}
+	i.readRegs = 1 << decode.Rn()
+	i.writeRegs = 1 << decode.Rd()
+	if i.operation == ARM64_ANDS {
+		i.writeRegs |= RWREGS_STATUS
+	}
 	return i, nil
 }
 
@@ -3134,6 +3307,12 @@ func (i *Instruction) decompose_logical_shifted_reg() (*Instruction, error) {
 		i.deleteOperand(0)
 	}
 
+	i.readRegs = (1 << decode.Rn()) | (1 << decode.Rm())
+	i.writeRegs = 1 << decode.Rd()
+	if (i.operation == ARM64_ANDS) || (i.operation == ARM64_BICS) {
+		i.writeRegs |= RWREGS_STATUS
+	}
+
 	return i, nil
 }
 
@@ -3191,6 +3370,11 @@ func (i *Instruction) decompose_move_wide_imm() (*Instruction, error) {
 		return nil, failedToDisassembleOperation
 	}
 
+	if i.operation == ARM64_MOVK {
+		i.readRegs = 1 << decode.Rd()
+	}
+	i.writeRegs = 1 << decode.Rd()
+
 	return i, nil
 }
 
@@ -3221,6 +3405,8 @@ func (i *Instruction) decompose_pc_rel_addr() (*Instruction, error) {
 		i.operands[1].SignedImm = 1
 	}
 	i.operands[1].Immediate = uint64(imm)
+
+	i.writeRegs = 1 << decode.Rd()
 
 	return i, nil
 }
@@ -4322,6 +4508,7 @@ func (i *Instruction) decompose_simd_copy() (*Instruction, error) {
 			if (decode.Q() == 0 && (decode.Imm5()&3) == 0) || (decode.Q() == 1 && (decode.Imm5()&7) == 0) {
 				return nil, failedToDecodeInstruction
 			}
+			i.writeRegs = 1 << decode.Rd()
 			break
 		case 7:
 			i.operation = ARM64_UMOV
@@ -4332,6 +4519,7 @@ func (i *Instruction) decompose_simd_copy() (*Instruction, error) {
 			i.operands[1].Reg[0] = reg(REGSET_ZR, REG_V_BASE, int(decode.Rn()))
 			i.operands[1].ElementSize = elemSize1
 			i.operands[1].Scale = 0x80000000 | (decode.Imm5() >> (size + 1))
+			i.writeRegs = 1 << decode.Rd()
 			/*printf("Q %d imm5 %d\n", decode.Q, decode.Imm5() )
 			if ((decode.Q() == 0 && (decode.Imm5()  & 3) == 0) || (decode.Q() == 1 &&
 					(((decode.Imm5()  & 15) == 0) ||
@@ -7974,6 +8162,11 @@ func (i *Instruction) decompose_test_branch_imm() (*Instruction, error) {
 	i.operands[2].OpClass = LABEL
 	i.operands[2].Immediate = i.address + uint64(decode.Imm()<<2)
 
+	i.branchType = BranchTypeCond
+	i.branchTargetAddr = i.operands[2].Immediate
+
+	i.readRegs = 1 << decode.Rt()
+
 	return i, nil
 }
 
@@ -7990,6 +8183,14 @@ func (i *Instruction) decompose_unconditional_branch() (*Instruction, error) {
 	i.operands[0].Immediate = i.address + uint64(decode.Imm()<<2)
 	if (int64(i.address) + int64(decode.Imm()<<2)) < 0 {
 		i.operands[0].SignedImm = 1
+	}
+	i.branchType = BranchTypeUncond
+	if i.operation == ARM64_BL {
+		i.branchType = BranchTypeCall
+	}
+	i.branchTargetAddr = i.operands[0].Immediate
+	if i.operation == ARM64_BL {
+		i.writeRegs = RWREGS_LINK
 	}
 	return i, nil
 }
@@ -8036,10 +8237,12 @@ func (i *Instruction) decompose_unconditional_branch_reg() (*Instruction, error)
 	}
 
 	i.operation = operations[decode.Opc()][decode.Op3()]
+	i.branchType = BranchTypeUncond
 	r := reg(1, REG_X_BASE, int(decode.Rn()))
 
 	switch decode.Opc() {
 	case 2: // RET
+		i.readRegs = 1 << decode.Rn()
 		if decode.Op3() == 0 {
 			if r == uint32(REG_X30) {
 				return i, nil
@@ -8059,13 +8262,21 @@ func (i *Instruction) decompose_unconditional_branch_reg() (*Instruction, error)
 	case 9:
 		i.operands[1].OpClass = REG
 		i.operands[1].Reg[0] = reg(REGSET_SP, REG_X_BASE, int(decode.Op4()))
+		i.readRegs = 1 << decode.Rn()
 		break
 	default:
+		i.readRegs = 1 << decode.Rn()
 		break
 	}
 
 	i.operands[0].OpClass = REG
 	i.operands[0].Reg[0] = r
+
+	if (i.operation == ARM64_BLR) || (i.operation == ARM64_BLRAA) || (i.operation == ARM64_BLRAAZ) ||
+		(i.operation == ARM64_BLRAB) || (i.operation == ARM64_BLRABZ) {
+		i.writeRegs = RWREGS_LINK
+		i.branchType = BranchTypeCall
+	}
 
 	return i, nil
 }

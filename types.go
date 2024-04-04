@@ -6073,12 +6073,40 @@ func (op InstructionOperand) Conditions() []Condition {
 	return conds
 }
 
+type BranchType int
+
+const (
+	BranchTypeNone BranchType = iota
+	BranchTypeCond
+	BranchTypeUncond
+	BranchTypeCall
+	BranchTypeException
+)
+
+// representation of the link register in the general purpose register read/write mask
+const RWREGS_LINK = uint64(1) << 30
+
+// representation of the status register in the general purpose register read/write mask (note that individual status bits
+// are not represented)
+const RWREGS_STATUS = uint64(1) << 32
+
+// representation of all general purpose registers in the general purpose register read/write mask for cases where the register
+// effect is unknown, to present a conservative approximation
+const RWREGS_ALL = (uint64(1) << 33) - 1
+
+// Instruction represents a decoded instruction
+// Note: read/write mask does not currently differentiate usage of r31 between zero and stack pointer and
+// non-general purpose register accesses (including system and SIMD/FP) are not represented
 type Instruction struct {
-	raw       uint32
-	address   uint64
-	group     Group
-	operation Operation
-	operands  [MAX_OPERANDS]InstructionOperand
+	raw              uint32
+	address          uint64
+	branchType       BranchType
+	branchTargetAddr uint64
+	readRegs         uint64 // general purpose register read mask (with bit 32 representing the status register)
+	writeRegs        uint64 // general purpose register write mask (with bit 32 representing the status register)
+	group            Group
+	operation        Operation
+	operands         [MAX_OPERANDS]InstructionOperand
 	// operands []InstructionOperand
 }
 
@@ -6090,6 +6118,18 @@ func (i *Instruction) OpCodes() string {
 }
 func (i *Instruction) Address() uint64 {
 	return i.address
+}
+func (i *Instruction) GetReadRegs() uint64 {
+	return i.readRegs
+}
+func (i *Instruction) GetWriteRegs() uint64 {
+	return i.readRegs
+}
+func (i *Instruction) BranchType() BranchType {
+	return i.branchType
+}
+func (i *Instruction) BranchTargetAddress() uint64 {
+	return i.branchTargetAddr
 }
 func (i *Instruction) Group() Group {
 	return i.group

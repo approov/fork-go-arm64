@@ -22,7 +22,7 @@ type Result struct {
 
 // Disassemble will output the disassembly of the data of a given io.ReadSeeker
 func DisassembleInstr(r io.ReadSeeker, offset int64, addr int64) (*Instruction, string, string, error) {
-	actualOffset, err := r.Seek(offset, io.SeekCurrent)
+	actualOffset, err := r.Seek(offset, io.SeekStart)
 	if (actualOffset != offset) || (err != nil) {
 		return nil, "", "", fmt.Errorf("failed to seek to offset")
 	}
@@ -41,7 +41,7 @@ func DisassembleInstr(r io.ReadSeeker, offset int64, addr int64) (*Instruction, 
 	}
 	annotation, err := instr.annotate()
 	if err != nil {
-		return nil, "", "", fmt.Errorf("failed to disassemble instruction: 0x%08x: 0x%08x (%v)", addr, instrValue, err)
+		return nil, "", "", fmt.Errorf("failed to annotate instruction: 0x%08x: 0x%08x (%v)", addr, instrValue, err)
 	}
 	return instr, disassembly, annotation, nil
 }

@@ -6123,7 +6123,7 @@ func (i *Instruction) GetReadRegs() uint64 {
 	return i.readRegs
 }
 func (i *Instruction) GetWriteRegs() uint64 {
-	return i.readRegs
+	return i.writeRegs
 }
 func (i *Instruction) BranchType() BranchType {
 	return i.branchType

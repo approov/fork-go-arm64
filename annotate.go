@@ -5,48 +5,39 @@ import (
 	"strings"
 )
 
+func GetRegString(regset uint64) string {
+	regs := make([]string, 0)
+	if regset == RWREGS_ALL {
+		return "all"
+
+	} else {
+		for reg := 0; reg < 32; reg++ {
+			if ((uint64(1) << reg) & regset) != 0 {
+				regs = append(regs, fmt.Sprintf("%d", reg))
+			}
+		}
+		if (regset & RWREGS_STATUS) != 0 {
+			regs = append(regs, "nzcv")
+		}
+	}
+	if len(regs) == 0 {
+		return "none"
+	}
+	return strings.Join(regs, ",")
+}
+
 func (i *Instruction) annotate() (string, error) {
 	var annotation strings.Builder
 	output := false
 	if i.readRegs != 0 {
-		regs := make([]string, 0)
-		annotation.WriteString("r:")
-		if i.readRegs == RWREGS_ALL {
-			annotation.WriteString("all")
-
-		} else {
-			for reg := 0; reg < 32; reg++ {
-				if ((uint64(1) << reg) & i.readRegs) != 0 {
-					regs = append(regs, fmt.Sprintf("%d", reg))
-				}
-			}
-			if (i.readRegs & RWREGS_STATUS) != 0 {
-				regs = append(regs, "nzcv")
-			}
-		}
-		annotation.WriteString(strings.Join(regs, ","))
+		annotation.WriteString("r:" + GetRegString(i.readRegs))
 		output = true
 	}
 	if i.writeRegs != 0 {
 		if output {
 			annotation.WriteString(", ")
 		}
-		regs := make([]string, 0)
-		annotation.WriteString("w:")
-		if i.writeRegs == RWREGS_ALL {
-			annotation.WriteString("all")
-
-		} else {
-			for reg := 0; reg < 32; reg++ {
-				if ((uint64(1) << reg) & i.writeRegs) != 0 {
-					regs = append(regs, fmt.Sprintf("%d", reg))
-				}
-			}
-			if (i.writeRegs & RWREGS_STATUS) != 0 {
-				regs = append(regs, "nzcv")
-			}
-		}
-		annotation.WriteString(strings.Join(regs, ","))
+		annotation.WriteString("w:" + GetRegString(i.writeRegs))
 		output = true
 	}
 	if i.branchType != BranchTypeNone {

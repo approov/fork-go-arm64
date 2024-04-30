@@ -40,11 +40,34 @@ func (i *Instruction) annotate() (string, error) {
 		annotation.WriteString("w:" + GetRegString(i.writeRegs))
 		output = true
 	}
+	if i.pcRelType != PCRelTypeNone {
+		if output {
+			annotation.WriteString(", ")
+		}
+		annotation.WriteString("pcrel:")
+		switch i.pcRelType {
+		case PCRelTypeBranchShort:
+			annotation.WriteString("br-short")
+		case PCRelTypeBranchLong:
+			annotation.WriteString("br-long")
+		case PCRelTypeAddrPage:
+			annotation.WriteString("addr-page")
+		case PCRelTypeAddrIndex:
+			annotation.WriteString("addr-index")
+		}
+		output = true
+	}
+	if BranchType(i.pcRelTargetAddr) != 0 {
+		if output {
+			annotation.WriteString(", ")
+		}
+		annotation.WriteString(fmt.Sprintf("t:%#x", i.pcRelTargetAddr))
+	}
 	if i.branchType != BranchTypeNone {
 		if output {
 			annotation.WriteString(", ")
 		}
-		annotation.WriteString("b:")
+		annotation.WriteString("br:")
 		switch i.branchType {
 		case BranchTypeCall:
 			annotation.WriteString("call")
@@ -56,12 +79,6 @@ func (i *Instruction) annotate() (string, error) {
 			annotation.WriteString("exception")
 		}
 		output = true
-	}
-	if BranchType(i.branchTargetAddr) != 0 {
-		if output {
-			annotation.WriteString(", ")
-		}
-		annotation.WriteString(fmt.Sprintf("t:%#x", i.branchTargetAddr))
 	}
 	return annotation.String(), nil
 }

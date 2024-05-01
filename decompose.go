@@ -3411,7 +3411,7 @@ func (i *Instruction) decompose_pc_rel_addr() (*Instruction, error) {
 	if decode.Op() == 1 {
 		i.pcRelType = PCRelTypeAddrPage
 	} else {
-		i.pcRelType = PCRelTypeAddrIndex
+		i.pcRelType = PCRelTypeAddrNear
 	}
 	i.pcRelTargetAddr = uint64(imm)
 	i.writeRegs = 1 << decode.Rd()

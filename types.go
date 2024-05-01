@@ -6080,7 +6080,7 @@ const (
 	PCRelTypeBranchShort
 	PCRelTypeBranchLong
 	PCRelTypeAddrPage
-	PCRelTypeAddrIndex
+	PCRelTypeAddrNear
 )
 
 type BranchType int
@@ -6100,9 +6100,16 @@ const RWREGS_LINK = uint64(1) << 30
 // are not represented)
 const RWREGS_STATUS = uint64(1) << 32
 
-// representation of all general purpose registers in the general purpose register read/write mask for cases where the register
-// effect is unknown, to present a conservative approximation
+// representation of all general purpose registers and status in the read/write mask for cases where the register effect is
+// unknown, to present a conservative approximation
 const RWREGS_ALL = (uint64(1) << 33) - 1
+
+// representation of all general purpose registers but without status in the read/write mask for cases where the register
+// effect is unknown but status will not be live, to present a conservative approximation
+const RWREGS_ALL_NO_STATUS = (uint64(1) << 32) - 1
+
+// total number of read/write registers that are defined
+const NUM_RWREGS = 33
 
 // Instruction represents a decoded instruction
 // Note: read/write mask does not currently differentiate usage of r31 between zero and stack pointer and

@@ -8198,7 +8198,7 @@ func (i *Instruction) decompose_unconditional_branch() (*Instruction, error) {
 	i.pcRelTargetAddr = i.operands[0].Immediate
 	i.branchType = BranchTypeUncond
 	if i.operation == ARM64_BL {
-		i.branchType = BranchTypeCall
+		i.branchType = BranchTypeUncondLink
 	}
 	if i.operation == ARM64_BL {
 		i.writeRegs = RWREGS_LINK
@@ -8286,7 +8286,7 @@ func (i *Instruction) decompose_unconditional_branch_reg() (*Instruction, error)
 	if (i.operation == ARM64_BLR) || (i.operation == ARM64_BLRAA) || (i.operation == ARM64_BLRAAZ) ||
 		(i.operation == ARM64_BLRAB) || (i.operation == ARM64_BLRABZ) {
 		i.writeRegs = RWREGS_LINK
-		i.branchType = BranchTypeCall
+		i.branchType = BranchTypeUncondLink
 	}
 
 	return i, nil

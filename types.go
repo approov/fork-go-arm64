@@ -1505,9 +1505,13 @@ func (i PcRelAddressing) Op() uint32 {
 func (i PcRelAddressing) Immediate() int32 {
 	return (i.Immhi() << 2) + int32(i.Immlo())
 }
-func (i PcRelAddressing) WithUpdatedImmediate(v int32) uint32 {
+func (i PcRelAddressing) WithUpdatedImmediate(v int32) (uint32, error) {
 	newInstr := SetBits(uint32(i), uint32(v>>2), 5, 19)
-	return SetBits(newInstr, uint32(v), 29, 2)
+	newInstr = SetBits(newInstr, uint32(v), 29, 2)
+	if PcRelAddressing(newInstr).Immediate() != v {
+		return 0, fmt.Errorf("failed to set immediate value")
+	}
+	return newInstr, nil
 }
 
 type AddSubImm uint32
@@ -1681,8 +1685,12 @@ type UnconditionalBranch uint32
 func (i UnconditionalBranch) Imm() int32 {
 	return int32(signExtend(ExtractBits(uint32(i), 0, 26), 26))
 }
-func (i UnconditionalBranch) WithUpdatedImm(v int32) uint32 {
-	return SetBits(uint32(i), uint32(v), 0, 26)
+func (i UnconditionalBranch) WithUpdatedImm(v int32) (uint32, error) {
+	newInstr := SetBits(uint32(i), uint32(v), 0, 26)
+	if UnconditionalBranch(newInstr).Imm() != v {
+		return 0, fmt.Errorf("failed to set immediate value")
+	}
+	return newInstr, nil
 }
 func (i UnconditionalBranch) Opcode() uint32 {
 	return ExtractBits(uint32(i), 26, 5)
@@ -1746,6 +1754,13 @@ func (i ConditionalBranchImm) O0() uint32 {
 }
 func (i ConditionalBranchImm) Imm() int32 {
 	return int32(signExtend(ExtractBits(uint32(i), 5, 19), 19))
+}
+func (i ConditionalBranchImm) WithUpdatedImm(v int32) (uint32, error) {
+	newInstr := SetBits(uint32(i), uint32(v), 5, 19)
+	if ConditionalBranchImm(newInstr).Imm() != v {
+		return 0, fmt.Errorf("failed to set immediate value")
+	}
+	return newInstr, nil
 }
 func (i ConditionalBranchImm) O1() uint32 {
 	return ExtractBits(uint32(i), 24, 1)

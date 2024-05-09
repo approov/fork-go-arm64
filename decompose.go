@@ -468,7 +468,7 @@ func (i *Instruction) decompose_compare_branch_imm() (*Instruction, error) {
 	}
 	i.operands[1].Immediate = uint64(imm)
 
-	i.pcRelType = PCRelTypeBranchShort
+	i.pcRelType = PCRelTypeCompareBranchImm
 	i.pcRelTargetAddr = uint64(imm)
 	i.branchType = BranchTypeCond
 	i.readRegs = 1 << decode.Rt()
@@ -501,7 +501,7 @@ func (i *Instruction) decompose_conditional_branch() (*Instruction, error) {
 		return nil, failedToDecodeInstruction
 	}
 
-	i.pcRelType = PCRelTypeBranchShort
+	i.pcRelType = PCRelTypeConditionalBranchImm
 	i.pcRelTargetAddr = uint64(imm)
 	i.branchType = BranchTypeCond
 	i.readRegs = RWREGS_STATUS
@@ -8170,7 +8170,7 @@ func (i *Instruction) decompose_test_branch_imm() (*Instruction, error) {
 	i.operands[2].OpClass = LABEL
 	i.operands[2].Immediate = i.address + uint64(decode.Imm()<<2)
 
-	i.pcRelType = PCRelTypeBranchShort
+	i.pcRelType = PCRelTypeTestAndBranch
 	i.pcRelTargetAddr = i.operands[2].Immediate
 	i.branchType = BranchTypeCond
 
@@ -8194,7 +8194,7 @@ func (i *Instruction) decompose_unconditional_branch() (*Instruction, error) {
 		i.operands[0].SignedImm = 1
 	}
 
-	i.pcRelType = PCRelTypeBranchLong
+	i.pcRelType = PCRelTypeUnconditionalBranch
 	i.pcRelTargetAddr = i.operands[0].Immediate
 	i.branchType = BranchTypeUncond
 	if i.operation == ARM64_BL {

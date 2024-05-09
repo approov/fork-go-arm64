@@ -46,10 +46,14 @@ func (i *Instruction) annotate() (string, error) {
 		}
 		annotation.WriteString("pcrel:")
 		switch i.pcRelType {
-		case PCRelTypeBranchShort:
-			annotation.WriteString("br-short")
-		case PCRelTypeBranchLong:
-			annotation.WriteString("br-long")
+		case PCRelTypeTestAndBranch:
+			annotation.WriteString("br-test")
+		case PCRelTypeCompareBranchImm:
+			annotation.WriteString("br-compare")
+		case PCRelTypeConditionalBranchImm:
+			annotation.WriteString("br-cond")
+		case PCRelTypeUnconditionalBranch:
+			annotation.WriteString("br-uncond")
 		case PCRelTypeAddrPage:
 			annotation.WriteString("addr-page")
 		case PCRelTypeAddrNear:

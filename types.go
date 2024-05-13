@@ -1522,8 +1522,22 @@ func (i AddSubImm) Rd() uint32 {
 func (i AddSubImm) Rn() uint32 {
 	return ExtractBits(uint32(i), 5, 5)
 }
+func (i AddSubImm) WithUpdatedRn(v uint32) (uint32, error) {
+	newInstr := SetBits(uint32(i), v, 5, 5)
+	if AddSubImm(newInstr).Rn() != v {
+		return 0, fmt.Errorf("AddSubImm: failed to set Rn value %d", v)
+	}
+	return newInstr, nil
+}
 func (i AddSubImm) Imm() uint32 {
 	return ExtractBits(uint32(i), 10, 12)
+}
+func (i AddSubImm) WithUpdatedImm(v uint32) (uint32, error) {
+	newInstr := SetBits(uint32(i), v, 10, 12)
+	if AddSubImm(newInstr).Imm() != v {
+		return 0, fmt.Errorf("AddSubImm: failed to set immediate value %d", v)
+	}
+	return newInstr, nil
 }
 func (i AddSubImm) Shift() uint32 {
 	return ExtractBits(uint32(i), 22, 2)
@@ -1597,8 +1611,22 @@ type MoveWideImm uint32
 func (i MoveWideImm) Rd() uint32 {
 	return ExtractBits(uint32(i), 0, 5)
 }
+func (i MoveWideImm) WithUpdatedRd(rd uint32) (uint32, error) {
+	newInstr := SetBits(uint32(i), rd, 0, 5)
+	if MoveWideImm(newInstr).Rd() != rd {
+		return 0, fmt.Errorf("MoveWideImm: failed to set Rd value %d", rd)
+	}
+	return newInstr, nil
+}
 func (i MoveWideImm) Imm() uint32 {
 	return ExtractBits(uint32(i), 5, 16)
+}
+func (i MoveWideImm) WithUpdatedImm(v uint32) (uint32, error) {
+	newInstr := SetBits(uint32(i), v, 5, 16)
+	if MoveWideImm(newInstr).Imm() != v {
+		return 0, fmt.Errorf("MoveWideImm: failed to set immediate value %d", v)
+	}
+	return newInstr, nil
 }
 func (i MoveWideImm) Hw() uint32 {
 	return ExtractBits(uint32(i), 21, 2)

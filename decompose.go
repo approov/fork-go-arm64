@@ -2624,6 +2624,7 @@ func (i *Instruction) decompose_load_store_reg_imm_common() (*Instruction, error
 	var shiftBase = []uint8{2, 3}
 	var simdShiftBase = []uint8{2, 3, 4}
 
+	isGPRegs := true
 	i.operands[2].SignedImm = 1
 	if i.operation == ARM64_LDPSW || i.operation == ARM64_STGP { // TODO this line had redundant checks in the C
 		i.operands[0].Reg[0] = reg(REGSET_ZR, REG_X_BASE, int(decode.Rt()))
@@ -2648,6 +2649,7 @@ func (i *Instruction) decompose_load_store_reg_imm_common() (*Instruction, error
 		i.operands[1].Reg[0] = reg(REGSET_ZR, int(simdRegSize[decode.Opc()]), int(decode.Rt2()))
 		i.operands[2].Reg[0] = reg(REGSET_SP, REG_X_BASE, int(decode.Rn()))
 		i.operands[2].Immediate = uint64(decode.Imm() << simdShiftBase[decode.Opc()])
+		isGPRegs = false
 	}
 
 	if i.operation == ARM64_UNDEFINED {
@@ -2655,10 +2657,12 @@ func (i *Instruction) decompose_load_store_reg_imm_common() (*Instruction, error
 	}
 
 	i.readRegs |= 1 << decode.Rn()
-	if (i.operation == ARM64_LDP) || (i.operation == ARM64_LDPSW) {
-		i.writeRegs |= (1 << decode.Rt()) | (1 << decode.Rt2())
-	} else if (i.operation == ARM64_STP) || (i.operation == ARM64_STGP) {
-		i.readRegs |= (1 << decode.Rt()) | (1 << decode.Rt2())
+	if isGPRegs {
+		if (i.operation == ARM64_LDP) || (i.operation == ARM64_LDPSW) {
+			i.writeRegs |= (1 << decode.Rt()) | (1 << decode.Rt2())
+		} else if (i.operation == ARM64_STP) || (i.operation == ARM64_STGP) {
+			i.readRegs |= (1 << decode.Rt()) | (1 << decode.Rt2())
+		}
 	}
 
 	return i, nil
@@ -2914,10 +2918,13 @@ func (i *Instruction) decompose_load_store_reg_reg_offset() (*Instruction, error
 		return nil, failedToDisassembleOperation
 	}
 
-	if op.store {
-		i.readRegs |= 1 << decode.Rt()
-	} else {
-		i.writeRegs = 1 << decode.Rt()
+	i.readRegs = (1 << decode.Rn()) | (1 << decode.Rm())
+	if (op.registerBase != REG_S_BASE) && (op.registerBase != REG_D_BASE) && (op.registerBase != REG_Q_BASE) {
+		if op.store {
+			i.readRegs |= 1 << decode.Rt()
+		} else {
+			i.writeRegs = 1 << decode.Rt()
+		}
 	}
 	return i, nil
 }
@@ -3031,12 +3038,14 @@ func (i *Instruction) decompose_load_store_reg_unscalled_imm() (*Instruction, er
 	}
 
 	i.readRegs = 1 << decode.Rn()
-	if decode.Opc() == 0 {
-		// we have a store operation
-		i.readRegs |= 1 << decode.Rt()
-	} else {
-		// we have a load operation
-		i.writeRegs = 1 << decode.Rt()
+	if (op.registerBase != REG_S_BASE) && (op.registerBase != REG_D_BASE) && (op.registerBase != REG_Q_BASE) {
+		if decode.Opc() == 0 {
+			// we have a store operation
+			i.readRegs |= 1 << decode.Rt()
+		} else {
+			// we have a load operation
+			i.writeRegs = 1 << decode.Rt()
+		}
 	}
 
 	return i, nil
@@ -3142,10 +3151,12 @@ func (i *Instruction) decompose_load_store_reg_unsigned_imm() (*Instruction, err
 	}
 
 	i.readRegs = 1 << decode.Rn()
-	if op.store {
-		i.readRegs |= 1 << decode.Rt()
-	} else {
-		i.writeRegs = 1 << decode.Rt()
+	if (op.registerBase != REG_S_BASE) && (op.registerBase != REG_D_BASE) && (op.registerBase != REG_Q_BASE) {
+		if op.store {
+			i.readRegs |= 1 << decode.Rt()
+		} else {
+			i.writeRegs = 1 << decode.Rt()
+		}
 	}
 	return i, nil
 }

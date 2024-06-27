@@ -6141,6 +6141,7 @@ const (
 	PCRelTypeUnconditionalBranch
 	PCRelTypeAddrPage
 	PCRelTypeAddrNear
+	PCRelTypeAddrLiteral
 )
 
 type BranchType int

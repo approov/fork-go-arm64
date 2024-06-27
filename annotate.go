@@ -58,6 +58,8 @@ func (i *Instruction) annotate() (string, error) {
 			annotation.WriteString("addr-page")
 		case PCRelTypeAddrNear:
 			annotation.WriteString("addr-near")
+		case PCRelTypeAddrLiteral:
+			annotation.WriteString("addr-literal")
 		}
 		output = true
 	}

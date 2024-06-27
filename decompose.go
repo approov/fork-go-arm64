@@ -1920,10 +1920,7 @@ func (i *Instruction) decompose_load_register_literal() (*Instruction, error) {
 	i.operands[0].Reg[0] = uint32(regMap[REGSET_ZR][op.regBase][decode.Rt()])
 
 	i.operands[1].OpClass = LABEL
-	i.operands[1].SignedImm = op.signedImm
-	if op.signedImm > 0 {
-		i.operands[1].Immediate = i.address - uint64(decode.Imm()<<2)
-	}
+	// i.operands[1].SignedImm = op.signedImm  Don't treat as signed
 	i.operands[1].Immediate = i.address + uint64(decode.Imm()<<2)
 
 	if i.operation == ARM64_UNDEFINED {
@@ -1932,6 +1929,9 @@ func (i *Instruction) decompose_load_register_literal() (*Instruction, error) {
 	if (decode.V() == 0) && (op.operation != ARM64_PRFM) {
 		i.writeRegs = 1 << decode.Rt()
 	}
+
+	i.pcRelType = PCRelTypeAddrLiteral
+	i.pcRelTargetAddr = uint64(i.operands[1].Immediate)
 
 	return i, nil
 }

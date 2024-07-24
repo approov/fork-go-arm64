@@ -2341,7 +2341,16 @@ func (i *Instruction) decompose_load_store_imm_post_idx() (*Instruction, error) 
 	}
 
 	i.readRegs = 1 << decode.Rn()
-	i.writeRegs = 1 << decode.Rt()
+	if op.registerBase < REG_S_BASE {
+		// we have a load/store of general purpose registers
+		if decode.Opc() == 0 {
+			// we have a store operation
+			i.readRegs |= 1 << decode.Rt()
+		} else {
+			// we have a load operation
+			i.writeRegs = 1 << decode.Rt()
+		}
+	}
 
 	return i, nil
 }

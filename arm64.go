@@ -37,7 +37,11 @@ func DisassembleInstr(r io.ReadSeeker, offset int64, addr int64) (*Instruction, 
 	}
 	disassembly, err := instr.disassemble(false)
 	if err != nil {
-		return nil, "", "", fmt.Errorf("failed to disassemble instruction: 0x%08x: 0x%08x (%v)", addr, instrValue, err)
+		if instrValue < 65536 {
+			return nil, "", "", fmt.Errorf("undefined instruction: 0x%08x: 0x%08x", addr, instrValue)
+		} else {
+			return nil, "", "", fmt.Errorf("failed to disassemble instruction: 0x%08x: 0x%08x (%v)", addr, instrValue, err)
+		}
 	}
 	annotation, err := instr.annotate()
 	if err != nil {
@@ -96,9 +100,15 @@ func Disassemble(r io.ReadSeeker, options Options) <-chan Result {
 
 			disassembly, err := instruction.disassemble(options.DecimalImm)
 			if err != nil {
+				var newErr error
+				if instrValue < 65536 {
+					newErr = fmt.Errorf("undefined instruction: 0x%08x", instrValue)
+				} else {
+					newErr = fmt.Errorf("failed to disassemble instruction: 0x%08x; %v", instrValue, err)
+				}
 				out <- Result{
 					StrRepr: fmt.Sprintf("%#08x:  %s\t<unknown>", uint64(addr), getOpCodeByteString(instrValue)),
-					Error:   fmt.Errorf("failed to disassemble instruction: 0x%08x; %v", instrValue, err),
+					Error:   newErr,
 				}
 				continue
 			}

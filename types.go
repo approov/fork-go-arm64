@@ -1490,6 +1490,13 @@ type PcRelAddressing uint32
 func (i PcRelAddressing) Rd() uint32 {
 	return ExtractBits(uint32(i), 0, 5)
 }
+func (i PcRelAddressing) WithUpdatedRd(v uint32) (uint32, error) {
+	newInstr := SetBits(uint32(i), v, 0, 5)
+	if PcRelAddressing(newInstr).Rd() != v {
+		return 0, fmt.Errorf("PcRelAddressing: failed to set Rd value %d", v)
+	}
+	return newInstr, nil
+}
 func (i PcRelAddressing) Immhi() int32 {
 	return int32(signExtend(ExtractBits(uint32(i), 5, 19), 19))
 }
@@ -1763,6 +1770,13 @@ type TestAndBranch uint32
 func (i TestAndBranch) Rt() uint32 {
 	return ExtractBits(uint32(i), 0, 5)
 }
+func (i TestAndBranch) WithUpdatedRt(v uint32) (uint32, error) {
+	newInstr := SetBits(uint32(i), v, 0, 5)
+	if TestAndBranch(newInstr).Rt() != v {
+		return 0, fmt.Errorf("TestAndBranch: failed to set Rt value %d", v)
+	}
+	return newInstr, nil
+}
 func (i TestAndBranch) Imm() int32 {
 	return int32(signExtend(ExtractBits(uint32(i), 5, 14), 14))
 }
@@ -1775,6 +1789,13 @@ func (i TestAndBranch) WithUpdatedImm(v int32) (uint32, error) {
 }
 func (i TestAndBranch) B40() uint32 {
 	return ExtractBits(uint32(i), 19, 5)
+}
+func (i TestAndBranch) WithUpdatedB40(v uint32) (uint32, error) {
+	newInstr := SetBits(uint32(i), v, 19, 5)
+	if TestAndBranch(newInstr).B40() != v {
+		return 0, fmt.Errorf("TestAndBranch: failed to set B40 value %d", v)
+	}
+	return newInstr, nil
 }
 func (i TestAndBranch) Op() uint32 {
 	return ExtractBits(uint32(i), 24, 1)

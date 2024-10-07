@@ -1091,10 +1091,6 @@ func (i *Instruction) decompose_exception_generation() (*Instruction, error) {
 
 	i.branchType = BranchTypeException
 
-	// we consider an exception to potentially read and write all registers
-	i.readRegs = RWREGS_ALL
-	i.writeRegs = RWREGS_ALL
-
 	return i, nil
 }
 
@@ -8285,6 +8281,7 @@ func (i *Instruction) decompose_unconditional_branch_reg() (*Instruction, error)
 		i.readRegs = 1 << decode.Rn()
 		if decode.Op3() == 0 {
 			if r == uint32(REG_X30) {
+				i.branchType = BranchTypeUncondReturn
 				return i, nil
 			}
 			break
@@ -8316,6 +8313,8 @@ func (i *Instruction) decompose_unconditional_branch_reg() (*Instruction, error)
 		(i.operation == ARM64_BLRAB) || (i.operation == ARM64_BLRABZ) {
 		i.writeRegs = RWREGS_LINK
 		i.branchType = BranchTypeUncondLink
+	} else if i.operation == ARM64_RET {
+		i.branchType = BranchTypeUncondReturn
 	}
 
 	return i, nil

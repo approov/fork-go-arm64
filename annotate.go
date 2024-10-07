@@ -77,6 +77,8 @@ func (i *Instruction) annotate() (string, error) {
 		switch i.branchType {
 		case BranchTypeUncondLink:
 			annotation.WriteString("uncond-link")
+		case BranchTypeUncondReturn:
+			annotation.WriteString("uncond-return")
 		case BranchTypeCond:
 			annotation.WriteString("cond")
 		case BranchTypeUncond:

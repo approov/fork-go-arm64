@@ -6172,6 +6172,7 @@ const (
 	BranchTypeCond
 	BranchTypeUncond
 	BranchTypeUncondLink
+	BranchTypeUncondReturn
 	BranchTypeException
 )
 
